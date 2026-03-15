@@ -399,8 +399,8 @@ void updateBlueButtonModes() {
 
   if (blueHoldArmed) {
     blueHoldArmed = false;
-    DBG_TS_MSG("BLUE long release -> show selected control bank");
-    modeManager.onBlueHoldReleased(currentControlBank);
+    DBG_TS_MSG("BLUE long release -> show active bank");
+    modeManager.onBlueHoldReleased(mainBank.getSelection());
     return;
   }
 

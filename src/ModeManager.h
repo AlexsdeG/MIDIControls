@@ -11,12 +11,13 @@ class ModeManager {
   void begin();
   void onModeBankChanged(uint8_t mode, setting_t bankSelection, bool flashSwitch);
   void onBlueHoldArmed();
-  void onBlueHoldReleased(setting_t controlBank);
+  void onBlueHoldReleased(setting_t bankSelection);
   void update();
 
  private:
   void setLed(bool on);
   bool getIdleLedForMode(uint8_t mode) const;
+  void startBankBlinkIndication(setting_t bankSelection);
 
   enum class Phase : uint8_t {
     Idle,

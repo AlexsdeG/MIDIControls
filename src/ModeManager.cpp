@@ -28,6 +28,35 @@ void ModeManager::setLed(bool on) {
   digitalWrite(ledPin, on ? HIGH : LOW);
 }
 
+void ModeManager::startBankBlinkIndication(setting_t bankSelection) {
+  if (bankSelection < 0)
+    bankSelection = 0;
+
+  const setting_t maxBank = static_cast<setting_t>(Config::MAIN_BANK_COUNT - 1);
+  if (bankSelection > maxBank)
+    bankSelection = maxBank;
+
+  indicateTargetBlinks = static_cast<uint8_t>(bankSelection);
+
+  if (indicateTargetBlinks == 0) {
+    indicateCompletedBlinks = 0;
+    phase = Phase::Idle;
+    setLed(getIdleLedForMode(currentMode));
+    DBG_TS_VAL("ModeManager indicate target", indicateTargetBlinks);
+    DBG_TS_MSG("ModeManager indicate skipped (0 blinks)");
+    return;
+  }
+
+  indicateCompletedBlinks = 0;
+  // Always start from OFF so the first ON edge is visible,
+  // especially after long-hold where the LED may already be ON.
+  setLed(false);
+  phase = Phase::IndicateOff;
+  phaseStartedMs = millis();
+
+  DBG_TS_VAL("ModeManager indicate target", indicateTargetBlinks);
+}
+
 void ModeManager::onModeBankChanged(uint8_t mode,
                                     setting_t bankSelection,
                                     bool flashSwitch) {
@@ -40,10 +69,8 @@ void ModeManager::onModeBankChanged(uint8_t mode,
   DBG_TS_VAL("ModeManager bank", bankSelection);
 
   if (flashSwitch) {
-    phase = Phase::SwitchFlashOff;
-    phaseStartedMs = millis();
-    setLed(false);
-    DBG_TS_MSG("ModeManager switch flash OFF");
+    startBankBlinkIndication(currentBank);
+    DBG_TS_MSG("ModeManager switch bank indication");
     return;
   }
 
@@ -54,25 +81,20 @@ void ModeManager::onModeBankChanged(uint8_t mode,
 void ModeManager::onBlueHoldArmed() {
   holdArmed = true;
   phase = Phase::Idle;
-  setLed(true);
-  DBG_TS_MSG("ModeManager hold armed");
+
+  // Hold-threshold feedback: light LED in Piano/Drum, force OFF in Control.
+  if (currentMode == Config::MODE_CONTROL) {
+    setLed(false);
+    DBG_TS_MSG("ModeManager hold armed (control mode -> LED OFF)");
+  } else {
+    setLed(true);
+    DBG_TS_MSG("ModeManager hold armed (piano/drum -> LED ON)");
+  }
 }
 
-void ModeManager::onBlueHoldReleased(setting_t controlBank) {
+void ModeManager::onBlueHoldReleased(setting_t bankSelection) {
   holdArmed = false;
-
-  if (controlBank < Config::BANK_CONTROL_1 ||
-      controlBank > Config::BANK_CONTROL_4) {
-    controlBank = Config::BANK_CONTROL_1;
-  }
-
-  indicateTargetBlinks = static_cast<uint8_t>(controlBank);
-  indicateCompletedBlinks = 0;
-  phase = Phase::IndicateOn;
-  phaseStartedMs = millis();
-  setLed(true);
-
-  DBG_TS_VAL("ModeManager indicate target", indicateTargetBlinks);
+  startBankBlinkIndication(bankSelection);
 }
 
 void ModeManager::update() {
@@ -96,11 +118,15 @@ void ModeManager::update() {
 
   case Phase::IndicateOn:
     if (now - phaseStartedMs >= Config::BLUE_INDICATE_ON_MS) {
-      setLed(false);
-      phase = Phase::IndicateOff;
-      phaseStartedMs = now;
-      indicateCompletedBlinks++;
-      DBG_TS_VAL("ModeManager indicate count", indicateCompletedBlinks);
+      if (indicateCompletedBlinks >= indicateTargetBlinks) {
+        phase = Phase::Idle;
+        setLed(getIdleLedForMode(currentMode));
+        DBG_TS_MSG("ModeManager indicate done");
+      } else {
+        setLed(false);
+        phase = Phase::IndicateOff;
+        phaseStartedMs = now;
+      }
     }
     return;
 
@@ -112,6 +138,8 @@ void ModeManager::update() {
         DBG_TS_MSG("ModeManager indicate done");
       } else {
         setLed(true);
+        indicateCompletedBlinks++;
+        DBG_TS_VAL("ModeManager indicate count", indicateCompletedBlinks);
         phase = Phase::IndicateOn;
         phaseStartedMs = now;
       }
