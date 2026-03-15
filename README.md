@@ -49,8 +49,8 @@ PlatformIO builds and links all source files automatically; do not compile singl
 |---|---|---|---|
 | Blue mode button | D12 | Mode switch + hold action | Short press cycles Piano -> Drum -> Control -> Piano; hold 1.5s arms indication, release blinks selected control bank once |
 | Blue status LED | A4 | Mode indication | Piano OFF, Drum OFF, Control ON; 120ms OFF flash on switch; one-shot blink count = selected control bank (2..5) on long-hold release |
-| Red action button | D11 | Record / monitor message | Sends `MCU::RECORD` (normal) and configurable shift message (default `MCU::REC_RDY_1`) |
-| Red feedback LED | A5 | Reserved/next step | Pin reserved in config for DAW feedback integration |
+| Red action button | D11 | Record / monitor message | Sends `RED_BUTTON_ADDRESSES[0]` (default `MCU::RECORD`) and `RED_BUTTON_ADDRESSES[1]` (default `MCU::REC_RDY_1`) using configurable type (`CC` by default, value `127/0` on press/release) |
+| Red feedback LED | A5 | DAW feedback state | Without shift shows global record state; while shift held shows selected-track monitor state (feedback-authoritative) |
 | Yellow shift button | D10 | Shift layer select | Momentary hold (active only while pressed) |
 | Matrix row R1 | D5 | 4x4 matrix scan | Note matrix row pin |
 | Matrix row R2 | D4 | 4x4 matrix scan | Note matrix row pin |
@@ -123,6 +123,16 @@ Use `uno_debug` when you need readable serial diagnostics.
 - Output style: timestamped, event-driven logs (button edges, mode changes,
   control-bank selections, red/shift actions, joystick/analog significant deltas)
 - In debug mode MIDI serial output is disabled intentionally.
+
+## Waveform 13 Mapping Notes (Red/LED)
+
+- Configure the custom control surface with both MIDI input and MIDI output.
+- Red (no shift) command uses `RED_BUTTON_ADDRESSES[0]`; feedback must be sent
+  by Waveform to `RED_RECORD_FEEDBACK_ADDRESS` for LED sync.
+- Shift+Red command uses `RED_BUTTON_ADDRESSES[1]`; feedback must be sent by
+  Waveform to `RED_MONITOR_FEEDBACK_ADDRESS` for monitor-state LED preview.
+- LED policy is feedback-authoritative: no DAW feedback means no LED state
+  update.
 
 ## Build & Flash (CLI equivalent)
 

@@ -63,6 +63,11 @@ bool bluePressed = false;
 bool blueHoldArmed = false;
 unsigned long bluePressStartedMs = 0;
 
+bool redPressed = false;
+MIDIAddress redPressedAddress = MIDIAddress::invalid();
+bool globalRecordStateFromDAW = false;
+bool selectedTrackMonitorStateFromDAW = false;
+
 setting_t currentControlBank = Config::BANK_CONTROL_1;
 
 setting_t toTransposerSelection(int8_t offset) {
@@ -126,16 +131,115 @@ void applyTransposeOffset(int8_t offset) {
   transposer.select(toTransposerSelection(offset));
 }
 
-void sendMomentaryNote(MIDIAddress address) {
+void sendNoteOn(MIDIAddress address) {
   constexpr uint8_t VELOCITY = 0x7F;
-  DBG_TS_VAL("MIDI Note address", address.getAddress());
-  DBG_TS_VAL("MIDI Note channel", address.getChannel().getOneBased());
+  DBG_TS_VAL("MIDI NoteOn address", address.getAddress());
+  DBG_TS_VAL("MIDI NoteOn channel", address.getChannel().getOneBased());
 #ifndef DEBUG_SERIAL
   Control_Surface.sendNoteOn(address, VELOCITY);
+#else
+  DBG_TS_MSG("DEBUG mode: MIDI send skipped");
+#endif
+}
+
+void sendNoteOff(MIDIAddress address) {
+  constexpr uint8_t VELOCITY = 0x7F;
+  DBG_TS_VAL("MIDI NoteOff address", address.getAddress());
+  DBG_TS_VAL("MIDI NoteOff channel", address.getChannel().getOneBased());
+#ifndef DEBUG_SERIAL
   Control_Surface.sendNoteOff(address, VELOCITY);
 #else
   DBG_TS_MSG("DEBUG mode: MIDI send skipped");
 #endif
+}
+
+void sendRedActionPressed(MIDIAddress address) {
+  DBG_TS_VAL("RED send address", address.getAddress());
+  DBG_TS_VAL("RED send channel", address.getChannel().getOneBased());
+#ifndef DEBUG_SERIAL
+  if (Config::RED_ACTION_MESSAGE_TYPE == Config::RedActionMessageType::ControlChange) {
+    constexpr uint8_t VALUE_ON = 0x7F;
+    DBG_TS_MSG("RED send type: CC (ON)");
+    Control_Surface.sendControlChange(address, VALUE_ON);
+  } else {
+    DBG_TS_MSG("RED send type: NoteOn");
+    sendNoteOn(address);
+  }
+#else
+  DBG_TS_MSG("DEBUG mode: RED MIDI send skipped");
+#endif
+}
+
+void sendRedActionReleased(MIDIAddress address) {
+  DBG_TS_VAL("RED release address", address.getAddress());
+  DBG_TS_VAL("RED release channel", address.getChannel().getOneBased());
+#ifndef DEBUG_SERIAL
+  if (Config::RED_ACTION_MESSAGE_TYPE == Config::RedActionMessageType::ControlChange) {
+    constexpr uint8_t VALUE_OFF = 0x00;
+    DBG_TS_MSG("RED send type: CC (OFF)");
+    Control_Surface.sendControlChange(address, VALUE_OFF);
+  } else {
+    DBG_TS_MSG("RED send type: NoteOff");
+    sendNoteOff(address);
+  }
+#else
+  DBG_TS_MSG("DEBUG mode: RED MIDI send skipped");
+#endif
+}
+
+bool isMessageForAddress(ChannelMessage message, MIDIAddress address) {
+  return message.getData1() == address.getAddress() &&
+         message.getChannel().getRaw() == address.getChannel().getRaw();
+}
+
+bool messageValueToState(ChannelMessage message) {
+  const auto type = message.getMessageType();
+  if (type == MIDIMessageType::NoteOff)
+    return false;
+  if (type == MIDIMessageType::NoteOn || type == MIDIMessageType::ControlChange)
+    return message.getData2() > 0;
+  return false;
+}
+
+void renderRedLED() {
+  const bool redLedOn =
+      shiftHeld ? selectedTrackMonitorStateFromDAW : globalRecordStateFromDAW;
+  digitalWrite(Config::PIN_RED_LED, redLedOn ? HIGH : LOW);
+}
+
+bool onMIDIChannelMessage(ChannelMessage message) {
+  bool stateChanged = false;
+
+  if (isMessageForAddress(message, Config::RED_RECORD_FEEDBACK_ADDRESS)) {
+    const auto type = message.getMessageType();
+    if (type == MIDIMessageType::NoteOn || type == MIDIMessageType::NoteOff ||
+        type == MIDIMessageType::ControlChange) {
+      const bool nextState = messageValueToState(message);
+      if (nextState != globalRecordStateFromDAW) {
+        globalRecordStateFromDAW = nextState;
+        stateChanged = true;
+        DBG_TS_VAL("DAW record state", globalRecordStateFromDAW ? 1 : 0);
+      }
+    }
+  }
+
+  if (isMessageForAddress(message, Config::RED_MONITOR_FEEDBACK_ADDRESS)) {
+    const auto type = message.getMessageType();
+    if (type == MIDIMessageType::NoteOn || type == MIDIMessageType::NoteOff ||
+        type == MIDIMessageType::ControlChange) {
+      const bool nextState = messageValueToState(message);
+      if (nextState != selectedTrackMonitorStateFromDAW) {
+        selectedTrackMonitorStateFromDAW = nextState;
+        stateChanged = true;
+        DBG_TS_VAL("DAW monitor state", selectedTrackMonitorStateFromDAW ? 1 : 0);
+      }
+    }
+  }
+
+  if (stateChanged)
+    renderRedLED();
+
+  return false;
 }
 
 void updateShiftState() {
@@ -144,23 +248,38 @@ void updateShiftState() {
     shiftHeld = true;
     shiftBank.select(Config::SHIFT_BANK_ACTIVE);
     DBG_TS_MSG("SHIFT pressed (active)");
+    renderRedLED();
   } else if (event == Button::Rising) {
     shiftHeld = false;
     shiftBank.select(Config::SHIFT_BANK_BASE);
     DBG_TS_MSG("SHIFT released (base)");
+    renderRedLED();
   }
 }
 
 void updateRedActionButton() {
-  if (redActionButton.update() != Button::Falling)
-    return;
+  const auto event = redActionButton.update();
 
-  if (shiftHeld) {
-    DBG_TS_MSG("RED action: SHIFT+RED -> input monitor toggle message");
-    sendMomentaryNote(Config::SHIFT_RED_MONITOR_ADDRESS);
-  } else {
-    DBG_TS_MSG("RED action: RED -> record message");
-    sendMomentaryNote(Config::RED_BUTTON_ADDRESSES[Config::SHIFT_BANK_BASE]);
+  if (event == Button::Falling) {
+    const setting_t redBank =
+        shiftHeld ? Config::SHIFT_BANK_ACTIVE : Config::SHIFT_BANK_BASE;
+    redPressedAddress = Config::RED_BUTTON_ADDRESSES[redBank];
+    redPressed = true;
+
+    if (shiftHeld) {
+      DBG_TS_MSG("RED action: SHIFT+RED -> shifted red message");
+    } else {
+      DBG_TS_MSG("RED action: RED -> base red message");
+    }
+
+    sendRedActionPressed(redPressedAddress);
+    return;
+  }
+
+  if (event == Button::Rising && redPressed) {
+    sendRedActionReleased(redPressedAddress);
+    redPressed = false;
+    redPressedAddress = MIDIAddress::invalid();
   }
 }
 
@@ -302,6 +421,9 @@ void setup() {
   DBG_SEP();
   DBG_TS_MSG("setup() starting");
 
+  pinMode(Config::PIN_RED_LED, OUTPUT);
+  digitalWrite(Config::PIN_RED_LED, LOW);
+
   DBG_TS_MSG("setup() step: buttons begin");
   blueBankButton.begin();
   yellowShiftButton.begin();
@@ -325,6 +447,8 @@ void setup() {
   joystickY.begin();
 #else
   DBG_TS_MSG("setup() step: Control_Surface.begin()");
+  Control_Surface.setMIDIInputCallbacks(onMIDIChannelMessage, nullptr, nullptr,
+                                        nullptr);
   Control_Surface.begin();
 #endif
 
@@ -340,8 +464,15 @@ void setup() {
   DBG_TS_MSG("Mode cycle: Piano -> Drum -> Control -> Piano");
   DBG_TS_MSG("Control selectors: S1,S2,S3,S4 -> banks 2,3,4,5");
   DBG_TS_MSG("LED idle: Piano OFF, Drum OFF, Control ON");
-  DBG_TS_VAL("SHIFT+RED monitor note", Config::SHIFT_RED_MONITOR_ADDRESS.getAddress());
-  DBG_TS_VAL("SHIFT+RED monitor ch", Config::SHIFT_RED_MONITOR_ADDRESS.getChannel().getOneBased());
+  DBG_TS_VAL("RED base note", Config::RED_BUTTON_ADDRESSES[Config::SHIFT_BANK_BASE].getAddress());
+  DBG_TS_VAL("RED base ch", Config::RED_BUTTON_ADDRESSES[Config::SHIFT_BANK_BASE].getChannel().getOneBased());
+  DBG_TS_VAL("RED shift note", Config::RED_BUTTON_ADDRESSES[Config::SHIFT_BANK_ACTIVE].getAddress());
+  DBG_TS_VAL("RED shift ch", Config::RED_BUTTON_ADDRESSES[Config::SHIFT_BANK_ACTIVE].getChannel().getOneBased());
+  DBG_TS_VAL("RED record feedback note", Config::RED_RECORD_FEEDBACK_ADDRESS.getAddress());
+  DBG_TS_VAL("RED record feedback ch", Config::RED_RECORD_FEEDBACK_ADDRESS.getChannel().getOneBased());
+  DBG_TS_VAL("RED monitor feedback note", Config::RED_MONITOR_FEEDBACK_ADDRESS.getAddress());
+  DBG_TS_VAL("RED monitor feedback ch", Config::RED_MONITOR_FEEDBACK_ADDRESS.getChannel().getOneBased());
+  renderRedLED();
   DBG_TS_MSG("setup() complete");
   DBG_SEP();
 }

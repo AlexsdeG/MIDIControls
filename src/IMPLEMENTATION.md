@@ -27,8 +27,13 @@
 ### Yellow shift + red action
 - Yellow is **momentary** (active only while held)
 - Red action:
-  - without shift: sends `MCU::RECORD`
-  - with shift: sends configurable monitor/track message (default `MCU::REC_RDY_1`)
+  - without shift: sends `RED_BUTTON_ADDRESSES[0]` (default `MCU::RECORD`)
+  - with shift: sends `RED_BUTTON_ADDRESSES[1]` (default `MCU::REC_RDY_1`)
+  - message type is configurable; default is Control Change (`127` on press, `0` on release)
+- Red LED (feedback-authoritative):
+  - without shift: shows DAW global record state from `RED_RECORD_FEEDBACK_ADDRESS`
+  - while shift held: shows selected-track monitor state from `RED_MONITOR_FEEDBACK_ADDRESS`
+  - no local optimistic toggle is applied if DAW feedback is missing
 
 ### Joystick transpose
 - Shift held + joystick Y high/low triggers transpose up/down with lock+hysteresis
@@ -59,8 +64,14 @@
 4. Hold Blue for ~1.5s: verify `armed` log while held, then one-shot blink log on release.
 5. Hold Yellow and move rotaries/joystick: verify shift activity + analog events.
 6. Press Red without shift: verify `MCU::RECORD` dispatch.
-7. Press Shift+Red: verify monitor message dispatch (`SHIFT_RED_MONITOR_ADDRESS`).
-8. If monitor action fails in Waveform, only update mapping constant in `Config.h`, rebuild, retest.
+7. Press Shift+Red: verify shifted message dispatch (`RED_BUTTON_ADDRESSES[1]`).
+8. Verify red LED state follows DAW feedback:
+  - global record when shift not held
+  - selected-track monitor while shift is held
+9. If LED does not update, confirm Waveform sends matching feedback for
+  `RED_RECORD_FEEDBACK_ADDRESS` and `RED_MONITOR_FEEDBACK_ADDRESS`.
+10. If monitor action fails in Waveform, update `RED_BUTTON_ADDRESSES[1]` in
+   `Config.h`, rebuild, retest.
 
 ## 4. Known Open Points
 

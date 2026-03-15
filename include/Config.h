@@ -4,6 +4,11 @@
 
 namespace Config {
 
+enum class RedActionMessageType : uint8_t {
+    Note,
+    ControlChange,
+};
+
 constexpr setting_t MAIN_BANK_COUNT = 6;
 constexpr setting_t SHIFT_BANK_COUNT = 2;
 constexpr setting_t SHIFT_BANK_BASE = 0;
@@ -162,7 +167,11 @@ constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> RED_BUTTON_ADDRESSES = {{
     {MCU::REC_RDY_1, Channel_1},
 }};
 
-constexpr MIDIAddress SHIFT_RED_MONITOR_ADDRESS = {MCU::REC_RDY_1, Channel_1};
+constexpr RedActionMessageType RED_ACTION_MESSAGE_TYPE =
+    RedActionMessageType::Note;
+
+constexpr MIDIAddress RED_RECORD_FEEDBACK_ADDRESS = {MCU::RECORD, Channel_1};
+constexpr MIDIAddress RED_MONITOR_FEEDBACK_ADDRESS = {MCU::REC_RDY_1, Channel_1};
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> JOYSTICK_Y_ADDRESSES = {{
     {MIDI_CC::Modulation_Wheel, Channel_1},
