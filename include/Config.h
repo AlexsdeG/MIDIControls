@@ -30,11 +30,16 @@ constexpr unsigned long BLUE_SWITCH_FLASH_MS = 120;
 constexpr unsigned long BLUE_INDICATE_ON_MS = 120;
 constexpr unsigned long BLUE_INDICATE_OFF_MS = 120;
 
-constexpr uint8_t SELECTOR_ROW = 0; // Top row
-constexpr uint8_t SELECTOR_COL_S1 = 0;
-constexpr uint8_t SELECTOR_COL_S2 = 1;
-constexpr uint8_t SELECTOR_COL_S3 = 2;
-constexpr uint8_t SELECTOR_COL_S4 = 3;
+constexpr uint8_t SELECTOR_COL = 0; // Right-most physical column (S1..S4 top-to-bottom)
+constexpr uint8_t SELECTOR_ROW_S1 = 0;
+constexpr uint8_t SELECTOR_ROW_S2 = 1;
+constexpr uint8_t SELECTOR_ROW_S3 = 2;
+constexpr uint8_t SELECTOR_ROW_S4 = 3;
+
+constexpr uint8_t PIANO_OCTAVE_UP_ROW = SELECTOR_ROW_S1;
+constexpr uint8_t PIANO_OCTAVE_UP_COL = SELECTOR_COL;
+constexpr uint8_t PIANO_OCTAVE_DOWN_ROW = SELECTOR_ROW_S2;
+constexpr uint8_t PIANO_OCTAVE_DOWN_COL = SELECTOR_COL;
 
 constexpr int8_t TRANSPOSE_MIN = -2;
 constexpr int8_t TRANSPOSE_MAX = 2;
@@ -93,45 +98,45 @@ constexpr PinList<4> MATRIX_COL_PINS = {
 };
 
 constexpr AddressMatrix<4, 4> BANK_0_PIANO = {{
-    {48, 49, 50, 51},
-    {52, 53, 54, 55},
-    {56, 57, 58, 59},
-    {60, 61, 62, 63},
+    {72, 70, 68, 66},
+    {71, 68, 63, 61},
+    {72, 71, 69, 67},
+    {65, 64, 62, 60},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_1_DRUMS = {{
-    {36, 38, 40, 41},
-    {43, 45, 47, 48},
-    {50, 42, 46, 49},
-    {51, 39, 44, 57},
+    {52, 51, 49, 50},
+    {56, 46, 47, 45},
+    {44, 42, 40, 39},
+    {39, 38, 35, 36},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_2_DAW = {{
-    {80, 81, 82, 83},
-    {84, 85, 86, 87},
-    {88, 89, 90, 91},
-    {92, 93, 94, 95},
+    {127, 126, 125, 124},
+    {123, 122, 121, 120},
+    {119, 118, 117, 116},
+    {115, 114, 113, 112},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_3_TRACK = {{
-    {16, 17, 18, 19},
-    {20, 21, 22, 23},
-    {24, 25, 26, 27},
-    {28, 29, 30, 31},
+    {111, 110, 109, 108},
+    {107, 106, 105, 104},
+    {103, 102, 101, 100},
+    {99, 98, 97, 96},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_4_TRACK = {{
-    {32, 33, 34, 35},
-    {36, 37, 38, 39},
-    {40, 41, 42, 43},
-    {44, 45, 46, 47},
+    {95, 94, 93, 92},
+    {91, 90, 89, 88},
+    {87, 86, 85, 84},
+    {83, 82, 81, 80},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_5_TRACK = {{
-    {64, 65, 66, 67},
-    {68, 69, 70, 71},
-    {72, 73, 74, 75},
-    {76, 77, 78, 79},
+    {79, 78, 77, 76},
+    {75, 74, 73, 72},
+    {71, 70, 69, 68},
+    {67, 66, 65, 64},
 }};
 
 constexpr Array<AddressMatrix<4, 4>, MAIN_BANK_COUNT> MATRIX_BANK_ADDRESSES = {{
@@ -146,10 +151,10 @@ constexpr Array<AddressMatrix<4, 4>, MAIN_BANK_COUNT> MATRIX_BANK_ADDRESSES = {{
 constexpr Array<MIDIChannelCable, MAIN_BANK_COUNT> MATRIX_BANK_CHANNELS = {{
     Channel_1,
     Channel_1,
-    Channel_1,
-    Channel_1,
-    Channel_1,
-    Channel_1,
+    Channel_16,
+    Channel_16,
+    Channel_16,
+    Channel_16,
 }};
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> ROTARY_1_ADDRESSES = {{
@@ -163,15 +168,15 @@ constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> ROTARY_2_ADDRESSES = {{
 }};
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> RED_BUTTON_ADDRESSES = {{
-    {MCU::RECORD, Channel_1},
-    {MCU::REC_RDY_1, Channel_1},
+    {MCU::RECORD, Channel_16},
+    {MCU::REC_RDY_1, Channel_16},
 }};
 
 constexpr RedActionMessageType RED_ACTION_MESSAGE_TYPE =
     RedActionMessageType::Note;
 
-constexpr MIDIAddress RED_RECORD_FEEDBACK_ADDRESS = {MCU::RECORD, Channel_1};
-constexpr MIDIAddress RED_MONITOR_FEEDBACK_ADDRESS = {MCU::REC_RDY_1, Channel_1};
+constexpr MIDIAddress RED_RECORD_FEEDBACK_ADDRESS = {MCU::RECORD, Channel_16};
+constexpr MIDIAddress RED_MONITOR_FEEDBACK_ADDRESS = {MCU::REC_RDY_1, Channel_16};
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> JOYSTICK_Y_ADDRESSES = {{
     {MIDI_CC::Modulation_Wheel, Channel_1},

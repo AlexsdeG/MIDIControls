@@ -311,19 +311,37 @@ void updateJoystickTranspose() {
   }
 }
 
-setting_t controlBankFromSelector(uint8_t col) {
-  if (col == Config::SELECTOR_COL_S1)
+setting_t controlBankFromSelector(uint8_t row) {
+  if (row == Config::SELECTOR_ROW_S1)
     return Config::BANK_CONTROL_1;
-  if (col == Config::SELECTOR_COL_S2)
+  if (row == Config::SELECTOR_ROW_S2)
     return Config::BANK_CONTROL_2;
-  if (col == Config::SELECTOR_COL_S3)
+  if (row == Config::SELECTOR_ROW_S3)
     return Config::BANK_CONTROL_3;
   return Config::BANK_CONTROL_4;
 }
 
 bool onMatrixButtonEvent(uint8_t row, uint8_t col, bool pressed) {
-  const bool isSelector =
-      row == Config::SELECTOR_ROW && col <= Config::SELECTOR_COL_S4;
+  const bool inPianoMode = modeFromBank(mainBank.getSelection()) == Config::MODE_PIANO;
+  const bool isPianoOctaveUp = row == Config::PIANO_OCTAVE_UP_ROW &&
+                               col == Config::PIANO_OCTAVE_UP_COL;
+  const bool isPianoOctaveDown = row == Config::PIANO_OCTAVE_DOWN_ROW &&
+                                 col == Config::PIANO_OCTAVE_DOWN_COL;
+
+  if (inPianoMode && (isPianoOctaveUp || isPianoOctaveDown)) {
+    if (pressed) {
+      if (isPianoOctaveUp) {
+        DBG_TS_MSG("PIANO S1 -> octave up");
+        applyTransposeOffset(currentTransposeOffset + 1);
+      } else {
+        DBG_TS_MSG("PIANO S2 -> octave down");
+        applyTransposeOffset(currentTransposeOffset - 1);
+      }
+    }
+    return true;
+  }
+
+  const bool isSelector = col == Config::SELECTOR_COL;
 
   if (!isSelector)
     return false;
@@ -335,8 +353,8 @@ bool onMatrixButtonEvent(uint8_t row, uint8_t col, bool pressed) {
   if (!pressed)
     return true;
 
-  const setting_t targetControlBank = controlBankFromSelector(col);
-  DBG_TS_VAL("MATRIX selector col", col);
+  const setting_t targetControlBank = controlBankFromSelector(row);
+  DBG_TS_VAL("MATRIX selector row", row);
   DBG_TS_VAL("MATRIX selector bank", targetControlBank);
   selectMainBank(targetControlBank, true, "matrix selector S1-S4");
   return true;
