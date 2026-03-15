@@ -1,23 +1,23 @@
 #include "ModeManager.h"
+
 #include "Debug.h"
 
-namespace {
-constexpr unsigned long BLINK_ON_MS = 120;
-constexpr unsigned long BLINK_OFF_MS = 120;
-constexpr unsigned long BLINK_PAUSE_MS = 700;
-}
-
-ModeManager::ModeManager(const OutputBank &bank, pin_t ledPin)
-    : bank(bank), ledPin(ledPin) {}
+ModeManager::ModeManager(pin_t ledPin) : ledPin(ledPin) {}
 
 void ModeManager::begin() {
   pinMode(ledPin, OUTPUT);
-  setLed(false);
-  hasLastBankSelection = false;
-  lastBankSelection = 0;
-  completedBlinks = 0;
-  inPause = false;
-  lastTransitionMs = millis();
+  phase = Phase::Idle;
+  phaseStartedMs = millis();
+  holdArmed = false;
+  indicateTargetBlinks = 0;
+  indicateCompletedBlinks = 0;
+  setLed(getIdleLedForMode(currentMode));
+}
+
+bool ModeManager::getIdleLedForMode(uint8_t mode) const {
+  if (mode == Config::MODE_CONTROL)
+    return true;
+  return false;
 }
 
 void ModeManager::setLed(bool on) {
@@ -28,82 +28,94 @@ void ModeManager::setLed(bool on) {
   digitalWrite(ledPin, on ? HIGH : LOW);
 }
 
-void ModeManager::resetBlinkPattern(setting_t bankSelection, unsigned long now) {
-  completedBlinks = 0;
-  inPause = false;
-  lastTransitionMs = now;
+void ModeManager::onModeBankChanged(uint8_t mode,
+                                    setting_t bankSelection,
+                                    bool flashSwitch) {
+  currentMode = mode;
+  currentBank = bankSelection;
+  holdArmed = false;
 
-  DBG_TS_VAL("ModeManager: resetBlinkPattern for bank", bankSelection);
+  DBG_SEP();
+  DBG_TS_VAL("ModeManager mode", mode);
+  DBG_TS_VAL("ModeManager bank", bankSelection);
 
-  if (bankSelection >= 2) {
-    DBG_TS_VAL("ModeManager: blink pattern – total blinks", bankSelection);
-    setLed(true);
-  } else if (bankSelection == 1) {
-    DBG_TS_MSG("ModeManager: bank 1 – LED solid ON");
-    setLed(true);
-  } else {
-    DBG_TS_MSG("ModeManager: bank 0 – LED OFF");
+  if (flashSwitch) {
+    phase = Phase::SwitchFlashOff;
+    phaseStartedMs = millis();
     setLed(false);
+    DBG_TS_MSG("ModeManager switch flash OFF");
+    return;
   }
+
+  phase = Phase::Idle;
+  setLed(getIdleLedForMode(currentMode));
+}
+
+void ModeManager::onBlueHoldArmed() {
+  holdArmed = true;
+  phase = Phase::Idle;
+  setLed(true);
+  DBG_TS_MSG("ModeManager hold armed");
+}
+
+void ModeManager::onBlueHoldReleased(setting_t controlBank) {
+  holdArmed = false;
+
+  if (controlBank < Config::BANK_CONTROL_1 ||
+      controlBank > Config::BANK_CONTROL_4) {
+    controlBank = Config::BANK_CONTROL_1;
+  }
+
+  indicateTargetBlinks = static_cast<uint8_t>(controlBank);
+  indicateCompletedBlinks = 0;
+  phase = Phase::IndicateOn;
+  phaseStartedMs = millis();
+  setLed(true);
+
+  DBG_TS_VAL("ModeManager indicate target", indicateTargetBlinks);
 }
 
 void ModeManager::update() {
-  const auto bankSelection = bank.getSelection();
   const auto now = millis();
 
-  if (!hasLastBankSelection || bankSelection != lastBankSelection) {
-    DBG_SEP();
-    DBG_TS_VAL("ModeManager: bank changed from", lastBankSelection);
-    DBG_TS_VAL("ModeManager: bank changed to  ", bankSelection);
-    hasLastBankSelection = true;
-    lastBankSelection = bankSelection;
-    resetBlinkPattern(bankSelection, now);
-  }
-
-  if (bankSelection == 0) {
-    if (ledOn)
-      setLed(false);
-    return;
-  }
-
-  if (bankSelection == 1) {
-    if (!ledOn)
-      setLed(true);
-    return;
-  }
-
-  const uint8_t targetBlinks = static_cast<uint8_t>(bankSelection);
-
-  if (inPause) {
-    if (now - lastTransitionMs >= BLINK_PAUSE_MS) {
-      DBG_TS_MSG("ModeManager: pause done – restarting blink cycle");
-      inPause = false;
-      completedBlinks = 0;
-      setLed(true);
-      lastTransitionMs = now;
+  switch (phase) {
+  case Phase::Idle:
+    if (!holdArmed) {
+      setLed(getIdleLedForMode(currentMode));
     }
     return;
-  }
 
-  if (ledOn) {
-    if (now - lastTransitionMs >= BLINK_ON_MS) {
+  case Phase::SwitchFlashOff:
+    if (now - phaseStartedMs >= Config::BLUE_SWITCH_FLASH_MS) {
+      phase = Phase::Idle;
+      phaseStartedMs = now;
+      setLed(getIdleLedForMode(currentMode));
+      DBG_TS_MSG("ModeManager switch flash done");
+    }
+    return;
+
+  case Phase::IndicateOn:
+    if (now - phaseStartedMs >= Config::BLUE_INDICATE_ON_MS) {
       setLed(false);
-      lastTransitionMs = now;
-      completedBlinks++;
+      phase = Phase::IndicateOff;
+      phaseStartedMs = now;
+      indicateCompletedBlinks++;
+      DBG_TS_VAL("ModeManager indicate count", indicateCompletedBlinks);
+    }
+    return;
 
-      DBG_TS_VAL("ModeManager: blink completed", completedBlinks);
-      DBG_TS_VAL("ModeManager: target blinks  ", targetBlinks);
-
-      if (completedBlinks >= targetBlinks) {
-        DBG_TS_MSG("ModeManager: entering pause");
-        inPause = true;
+  case Phase::IndicateOff:
+    if (now - phaseStartedMs >= Config::BLUE_INDICATE_OFF_MS) {
+      if (indicateCompletedBlinks >= indicateTargetBlinks) {
+        phase = Phase::Idle;
+        setLed(getIdleLedForMode(currentMode));
+        DBG_TS_MSG("ModeManager indicate done");
+      } else {
+        setLed(true);
+        phase = Phase::IndicateOn;
+        phaseStartedMs = now;
       }
     }
     return;
-  }
-
-  if (now - lastTransitionMs >= BLINK_OFF_MS) {
-    setLed(true);
-    lastTransitionMs = now;
   }
 }

@@ -8,6 +8,29 @@ constexpr setting_t MAIN_BANK_COUNT = 6;
 constexpr setting_t SHIFT_BANK_COUNT = 2;
 constexpr setting_t SHIFT_BANK_BASE = 0;
 constexpr setting_t SHIFT_BANK_ACTIVE = 1;
+
+constexpr setting_t BANK_PIANO = 0;
+constexpr setting_t BANK_DRUM = 1;
+constexpr setting_t BANK_CONTROL_1 = 2;
+constexpr setting_t BANK_CONTROL_2 = 3;
+constexpr setting_t BANK_CONTROL_3 = 4;
+constexpr setting_t BANK_CONTROL_4 = 5;
+
+constexpr uint8_t MODE_PIANO = 0;
+constexpr uint8_t MODE_DRUM = 1;
+constexpr uint8_t MODE_CONTROL = 2;
+
+constexpr unsigned long BLUE_HOLD_THRESHOLD_MS = 1500;
+constexpr unsigned long BLUE_SWITCH_FLASH_MS = 120;
+constexpr unsigned long BLUE_INDICATE_ON_MS = 120;
+constexpr unsigned long BLUE_INDICATE_OFF_MS = 120;
+
+constexpr uint8_t SELECTOR_ROW = 0; // Top row
+constexpr uint8_t SELECTOR_COL_S1 = 0;
+constexpr uint8_t SELECTOR_COL_S2 = 1;
+constexpr uint8_t SELECTOR_COL_S3 = 2;
+constexpr uint8_t SELECTOR_COL_S4 = 3;
+
 constexpr int8_t TRANSPOSE_MIN = -2;
 constexpr int8_t TRANSPOSE_MAX = 2;
 
@@ -136,8 +159,10 @@ constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> ROTARY_2_ADDRESSES = {{
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> RED_BUTTON_ADDRESSES = {{
     {MCU::RECORD, Channel_1},
-    {MCU::UNDO, Channel_1},
+    {MCU::REC_RDY_1, Channel_1},
 }};
+
+constexpr MIDIAddress SHIFT_RED_MONITOR_ADDRESS = {MCU::REC_RDY_1, Channel_1};
 
 constexpr Array<MIDIAddress, SHIFT_BANK_COUNT> JOYSTICK_Y_ADDRESSES = {{
     {MIDI_CC::Modulation_Wheel, Channel_1},

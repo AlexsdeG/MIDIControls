@@ -2,24 +2,40 @@
 
 #include <Control_Surface.h>
 
+#include "Config.h"
+
 class ModeManager {
  public:
-  ModeManager(const OutputBank &bank, pin_t ledPin);
+  explicit ModeManager(pin_t ledPin);
 
   void begin();
+  void onModeBankChanged(uint8_t mode, setting_t bankSelection, bool flashSwitch);
+  void onBlueHoldArmed();
+  void onBlueHoldReleased(setting_t controlBank);
   void update();
 
  private:
   void setLed(bool on);
-  void resetBlinkPattern(setting_t bankSelection, unsigned long now);
+  bool getIdleLedForMode(uint8_t mode) const;
 
-  const OutputBank &bank;
+  enum class Phase : uint8_t {
+    Idle,
+    SwitchFlashOff,
+    IndicateOn,
+    IndicateOff,
+  };
+
   const pin_t ledPin;
 
-  bool hasLastBankSelection = false;
-  setting_t lastBankSelection = 0;
-  uint8_t completedBlinks = 0;
+  uint8_t currentMode = Config::MODE_PIANO;
+  setting_t currentBank = Config::BANK_PIANO;
+
   bool ledOn = false;
-  bool inPause = false;
-  unsigned long lastTransitionMs = 0;
+  bool holdArmed = false;
+
+  Phase phase = Phase::Idle;
+  unsigned long phaseStartedMs = 0;
+
+  uint8_t indicateTargetBlinks = 0;
+  uint8_t indicateCompletedBlinks = 0;
 };

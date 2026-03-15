@@ -36,12 +36,20 @@ class TransposedManyMatrixAddress {
 
 template <setting_t NumBanks, uint8_t NumRows, uint8_t NumCols>
 class TransposedManyAddressNoteButtonMatrix
-    : public Bankable::MIDIButtonMatrix<
-          TransposedManyMatrixAddress<NumBanks, NumRows, NumCols>,
-          DigitalNoteSender,
+    : public MIDIOutputElement,
+      public AH::ButtonMatrix<
+          TransposedManyAddressNoteButtonMatrix<NumBanks, NumRows, NumCols>,
           NumRows,
           NumCols> {
+  using ButtonMatrix =
+      AH::ButtonMatrix<TransposedManyAddressNoteButtonMatrix, NumRows, NumCols>;
+  friend class AH::ButtonMatrix<TransposedManyAddressNoteButtonMatrix,
+                                NumRows,
+                                NumCols>;
+
  public:
+  using ButtonEventCallback = bool (*)(uint8_t row, uint8_t col, bool pressed);
+
   TransposedManyAddressNoteButtonMatrix(
       const Bank<NumBanks> &bank,
       const PinList<NumRows> &rowPins,
@@ -50,17 +58,54 @@ class TransposedManyAddressNoteButtonMatrix
       const Array<MIDIChannelCable, NumBanks> &channelCNs,
       OutputBankConfig<> transposeConfig,
       uint8_t velocity = 0x7F)
-      : Bankable::MIDIButtonMatrix<
-            TransposedManyMatrixAddress<NumBanks, NumRows, NumCols>,
-            DigitalNoteSender,
-            NumRows,
-            NumCols>({bank, notes, channelCNs, transposeConfig},
-                      rowPins,
-                      colPins,
-                      {velocity}) {}
+      : ButtonMatrix(rowPins, colPins),
+        address({bank, notes, channelCNs, transposeConfig}),
+        sender({velocity}) {}
 
-  void setVelocity(uint8_t velocity) { this->sender.setVelocity(velocity); }
-  uint8_t getVelocity() const { return this->sender.getVelocity(); }
+  void begin() override { ButtonMatrix::begin(); }
+
+  void update() override { ButtonMatrix::update(); }
+
+  void setVelocity(uint8_t velocity) { sender.setVelocity(velocity); }
+  uint8_t getVelocity() const { return sender.getVelocity(); }
+
+  void setButtonEventCallback(ButtonEventCallback callback) {
+    eventCallback = callback;
+  }
+
+ private:
+  void onButtonChanged(uint8_t row, uint8_t col, bool state) {
+    const bool pressed = state == LOW;
+    bool suppressMIDISend = false;
+
+    if (eventCallback) {
+      suppressMIDISend = eventCallback(row, col, pressed);
+    }
+
+    if (pressed) {
+      if (!activeButtons)
+        address.lock();
+      activeButtons++;
+      if (!suppressMIDISend)
+        sender.sendOn(address.getActiveAddress(row, col));
+    } else {
+      if (!suppressMIDISend)
+        sender.sendOff(address.getActiveAddress(row, col));
+
+      if (activeButtons > 0)
+        activeButtons--;
+      if (!activeButtons)
+        address.unlock();
+    }
+  }
+
+ private:
+  TransposedManyMatrixAddress<NumBanks, NumRows, NumCols> address;
+  uint16_t activeButtons = 0;
+  ButtonEventCallback eventCallback;
+
+ public:
+  DigitalNoteSender sender;
 };
 
 }  // namespace MIDIControls

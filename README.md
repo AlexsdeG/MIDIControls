@@ -4,12 +4,14 @@ Modular multi-bank MIDI controller firmware for a jailbroken Arduino Uno.
 
 ## Features
 
-- Multi-bank 4x4 matrix controller (Piano, Drum, DAW, Track-control banks)
+- 3-mode blue workflow: Piano -> Drum -> Control -> Piano
+- Control sub-bank selector using matrix S1-S4 (top row)
 - Native serial MIDI workflow for MocoLUFA-jailbroken Uno (`31250` baud)
-- Shift layer (Yellow button) for alternate knob/button behavior
+- Momentary shift layer (Yellow button held)
 - Joystick pitch bend + octave transposition control
-- Blue LED mode-state engine (off/solid/blink patterns, non-blocking)
+- Blue LED event engine: Piano OFF, Drum OFF, Control ON, long-hold one-shot bank indication
 - IR remote transport control integration (play/stop/record/rew/ff)
+- Dedicated serial debug build (`uno_debug`) with timestamped event logs
 - Centralized `Config.h` for fast pin/mapping tuning
 
 ## What You Need To Start
@@ -45,11 +47,11 @@ PlatformIO builds and links all source files automatically; do not compile singl
 
 | Component | Pins | Current Feature | Description |
 |---|---|---|---|
-| Blue mode button | D12 | Main bank/page switch | Advances through banks 0..5 (wrapped) |
-| Blue status LED | A4 | Mode indication | Bank 0 off, bank 1 solid on, bank 2..5 blink count = bank index |
-| Red action button | D11 | Record / Undo | Sends `MCU::RECORD` (normal) and `MCU::UNDO` (with Yellow shift) |
+| Blue mode button | D12 | Mode switch + hold action | Short press cycles Piano -> Drum -> Control -> Piano; hold 1.5s arms indication, release blinks selected control bank once |
+| Blue status LED | A4 | Mode indication | Piano OFF, Drum OFF, Control ON; 120ms OFF flash on switch; one-shot blink count = selected control bank (2..5) on long-hold release |
+| Red action button | D11 | Record / monitor message | Sends `MCU::RECORD` (normal) and configurable shift message (default `MCU::REC_RDY_1`) |
 | Red feedback LED | A5 | Reserved/next step | Pin reserved in config for DAW feedback integration |
-| Yellow shift button | D10 | Shift layer select | Toggles shift bank used by rotary/button alternate mappings |
+| Yellow shift button | D10 | Shift layer select | Momentary hold (active only while pressed) |
 | Matrix row R1 | D5 | 4x4 matrix scan | Note matrix row pin |
 | Matrix row R2 | D4 | 4x4 matrix scan | Note matrix row pin |
 | Matrix row R3 | D3 | 4x4 matrix scan | Note matrix row pin |
@@ -74,21 +76,22 @@ PlatformIO builds and links all source files automatically; do not compile singl
 
 ## Current Architecture
 
-- `Config.h`: centralized pins, bank maps, joystick thresholds, IR codes
-- `main.cpp`: object graph + non-blocking loop orchestration
-- `ModeManager`: blue LED mode state machine via `millis()` (no `delay`)
+- `Config.h`: centralized pins, mode constants, bank maps, timing thresholds, IR codes
+- `main.cpp`: mode/bank orchestration, selector routing, shift and red action logic
+- `ModeManager`: event-driven blue LED state machine via `millis()` (no `delay`)
 - `IRHandler`: IR decode, command mapping, replay protection + resume handling
-- `TransposedManyAddressNoteButtonMatrix`: custom adapter to combine
-  - 6-bank matrix addressing and
-  - transposer offset
+- `TransposedManyAddressNoteButtonMatrix`: custom adapter for matrix routing,
+  transposer offset, and selector-key event interception in control mode
 
 ## Robustness Decisions
 
 - Button/state logic is event-driven (`Button::Falling`) to avoid repeated triggers.
-- Main-bank cycling uses explicit wrap logic: `(current + 1) % MAIN_BANK_COUNT`.
+- Blue short/long behavior uses explicit non-blocking timing (`millis()`) with
+  separate short-press and long-release paths.
 - Joystick transpose uses threshold + lock + release-window hysteresis:
   - avoids rapid repeated octave changes from analog jitter.
-- Mode LED logic is non-blocking and deterministic by bank index.
+- Mode LED logic is non-blocking and deterministic by mode state (OFF/OFF/ON)
+  with one-shot indication sequence.
 - IR handling includes:
   - repeat-frame ignore option
   - minimum dispatch interval guard
@@ -97,16 +100,29 @@ PlatformIO builds and links all source files automatically; do not compile singl
 ## Feature Coverage vs Brainstorm
 
 - Implemented:
-  - Yellow shift bank for alternate controls
-  - Red button dual behavior (`RECORD` / `UNDO`)
-  - 6-bank matrix addressing (piano, drum, DAW, tracks)
+  - 3-mode blue cycle (Piano -> Drum -> Control)
+  - Control sub-bank selection by S1/S2/S3/S4 -> banks 2/3/4/5
+  - Momentary yellow shift layer for alternate controls
+  - Red button dual behavior (`RECORD` / configurable shift-monitor action)
   - Joystick X pitch bend + joystick Y modulation/transposition behavior
-  - Blue LED bank-mode state signaling with blink patterns
+  - Blue LED event behavior: OFF/OFF/ON + one-shot hold-release indication
   - IR receiver transport command injection
+  - Human-readable serial debug environment with timestamped event logs
 - Not fully implemented yet (hardware/DAW validation pending):
+  - final Waveform 13 mapping confirmation for shift-monitor action
   - physical verification steps in `IMPLEMENTATION.md`
   - advanced red LED feedback from DAW state
-  - richer control-bank DAW mapping beyond current baseline
+  - richer per-DAW control-bank mapping presets beyond current baseline
+
+## Debug Mode
+
+Use `uno_debug` when you need readable serial diagnostics.
+
+- Build/upload environment: `uno_debug`
+- Serial monitor speed: `115200`
+- Output style: timestamped, event-driven logs (button edges, mode changes,
+  control-bank selections, red/shift actions, joystick/analog significant deltas)
+- In debug mode MIDI serial output is disabled intentionally.
 
 ## Build & Flash (CLI equivalent)
 
