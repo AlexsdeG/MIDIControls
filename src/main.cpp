@@ -70,6 +70,8 @@ bool selectedTrackMonitorStateFromDAW = false;
 
 setting_t currentControlBank = Config::BANK_CONTROL_1;
 
+void applyTransposeOffset(int8_t offset);
+
 setting_t toTransposerSelection(int8_t offset) {
   return static_cast<setting_t>(offset - Config::TRANSPOSE_MIN);
 }
@@ -96,6 +98,13 @@ void selectMainBank(setting_t nextBank, bool flashSwitch, const char *reason) {
   const setting_t prev = mainBank.getSelection();
   if (prev == nextBank)
     return;
+
+  // Reset octave transpose when leaving piano mode so drum/control banks
+  // are never accidentally shifted by a previously set piano octave.
+  if (prev == Config::BANK_PIANO && nextBank != Config::BANK_PIANO) {
+    applyTransposeOffset(0);
+    DBG_TS_MSG("PIANO -> non-piano: transpose reset to 0");
+  }
 
   mainBank.select(nextBank);
   if (nextBank >= Config::BANK_CONTROL_1 && nextBank <= Config::BANK_CONTROL_4) {
@@ -331,17 +340,21 @@ bool onMatrixButtonEvent(uint8_t row, uint8_t col, bool pressed) {
   if (inPianoMode && (isPianoOctaveUp || isPianoOctaveDown)) {
     if (pressed) {
       if (isPianoOctaveUp) {
-        DBG_TS_MSG("PIANO S1 -> octave up");
-        applyTransposeOffset(currentTransposeOffset + 1);
+        const int8_t next = currentTransposeOffset + 1;
+        DBG_TS_VAL("PIANO S1 -> octave up, new offset", next);
+        applyTransposeOffset(next);
+        DBG_TS_VAL("PIANO octave position (0=base)", currentTransposeOffset);
       } else {
-        DBG_TS_MSG("PIANO S2 -> octave down");
-        applyTransposeOffset(currentTransposeOffset - 1);
+        const int8_t next = currentTransposeOffset - 1;
+        DBG_TS_VAL("PIANO S2 -> octave down, new offset", next);
+        applyTransposeOffset(next);
+        DBG_TS_VAL("PIANO octave position (0=base)", currentTransposeOffset);
       }
     }
     return true;
   }
 
-  const bool isSelector = col == Config::SELECTOR_COL;
+  const bool isSelector = col == Config::SELECTOR_ROW_S1;
 
   if (!isSelector)
     return false;

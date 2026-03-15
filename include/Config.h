@@ -30,16 +30,19 @@ constexpr unsigned long BLUE_SWITCH_FLASH_MS = 120;
 constexpr unsigned long BLUE_INDICATE_ON_MS = 120;
 constexpr unsigned long BLUE_INDICATE_OFF_MS = 120;
 
-constexpr uint8_t SELECTOR_COL = 0; // Right-most physical column (S1..S4 top-to-bottom)
-constexpr uint8_t SELECTOR_ROW_S1 = 0;
+constexpr uint8_t SELECTOR_COL_S1 = 0; 
+constexpr uint8_t SELECTOR_COL_S2 = 1;
+constexpr uint8_t SELECTOR_COL_S3 = 2;
+constexpr uint8_t SELECTOR_COL_S4 = 3;
+constexpr uint8_t SELECTOR_ROW_S1 = 0; // Right-most physical row (S1..S4 top-to-bottom)
 constexpr uint8_t SELECTOR_ROW_S2 = 1;
 constexpr uint8_t SELECTOR_ROW_S3 = 2;
 constexpr uint8_t SELECTOR_ROW_S4 = 3;
 
 constexpr uint8_t PIANO_OCTAVE_UP_ROW = SELECTOR_ROW_S1;
-constexpr uint8_t PIANO_OCTAVE_UP_COL = SELECTOR_COL;
-constexpr uint8_t PIANO_OCTAVE_DOWN_ROW = SELECTOR_ROW_S2;
-constexpr uint8_t PIANO_OCTAVE_DOWN_COL = SELECTOR_COL;
+constexpr uint8_t PIANO_OCTAVE_UP_COL = SELECTOR_COL_S1;
+constexpr uint8_t PIANO_OCTAVE_DOWN_ROW = SELECTOR_ROW_S1;
+constexpr uint8_t PIANO_OCTAVE_DOWN_COL = SELECTOR_COL_S2;
 
 constexpr int8_t TRANSPOSE_MIN = -2;
 constexpr int8_t TRANSPOSE_MAX = 2;
@@ -98,17 +101,17 @@ constexpr PinList<4> MATRIX_COL_PINS = {
 };
 
 constexpr AddressMatrix<4, 4> BANK_0_PIANO = {{
-    {72, 70, 68, 66},
-    {71, 68, 63, 61},
-    {72, 71, 69, 67},
-    {65, 64, 62, 60},
+    {55, 56, 72, 65},
+    {70, 73, 71, 64},
+    {68, 63, 69, 62},
+    {66, 61, 67, 60},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_1_DRUMS = {{
-    {52, 51, 49, 50},
-    {56, 46, 47, 45},
-    {44, 42, 40, 39},
-    {39, 38, 35, 36},
+    {52, 56, 44, 37},
+    {51, 46, 42, 38},
+    {49, 47, 40, 35},
+    {50, 45, 39, 36},
 }};
 
 constexpr AddressMatrix<4, 4> BANK_2_DAW = {{

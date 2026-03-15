@@ -134,6 +134,78 @@ Use `uno_debug` when you need readable serial diagnostics.
 - LED policy is feedback-authoritative: no DAW feedback means no LED state
   update.
 
+## Matrix Layouts
+
+The physical matrix is 4 rows × 4 columns. **Col 0 is the rightmost physical
+column.** In piano mode col 0 holds octave controls (no note sent). In control
+mode col 0 selects the active sub-bank (S1–S4 top to bottom, no note sent).
+All tables show physical orientation: left = Col 3, right = Col 0.
+
+### Piano mode — Channel 1
+
+Base notes at transpose offset 0. Transpose range ±2 octaves via S1/S2.
+S1 and S2 change the octave only — no MIDI note is sent when pressed.
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 65 — F4 | 72 — C5 | 56 — G#3 | **S1 — Octave UP** |
+| **Row 1** | 64 — E4 | 71 — B4 | 73 — C#5 | **S2 — Octave DOWN** |
+| **Row 2** | 62 — D4 | 69 — A4 | 63 — D#4 | 68 — G#4 |
+| **Row 3** | 60 — C4 | 67 — G4 | 61 — C#4 | 66 — F#4 |
+
+### Drum mode — Channel 1
+
+Standard GM drum map. All 16 pads send notes normally in drum mode.
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 37 — Side Stick | 44 — Pedal Hi-Hat | 56 — Cowbell | 52 — Chinese Cym |
+| **Row 1** | 38 — Acoustic Snare | 42 — Closed Hi-Hat | 46 — Open Hi-Hat | 51 — Ride Cym 1 |
+| **Row 2** | 35 — Acoustic BD | 40 — Electric Snare | 47 — Low-Mid Tom | 49 — Crash Cym 2 |
+| **Row 3** | 36 — Bass Drum 1 | 39 — Hand Clap | 45 — Low Tom | 50 — High Tom |
+
+### Control banks — Channel 16
+
+Col 0 (right column) = bank sub-selector buttons S1–S4 — these switch the
+active control bank and send **no note**. Cols 1–3 send notes for DAW
+MIDI-learn mapping.
+
+#### Bank 2 (DAW) — selected by S1
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 124 | 125 | 126 | S1 → Bank 2 |
+| **Row 1** | 120 | 121 | 122 | S2 → Bank 3 |
+| **Row 2** | 116 | 117 | 118 | S3 → Bank 4 |
+| **Row 3** | 112 | 113 | 114 | S4 → Bank 5 |
+
+#### Bank 3 (Track A) — selected by S2
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 108 | 109 | 110 | S1 → Bank 2 |
+| **Row 1** | 104 | 105 | 106 | S2 → Bank 3 |
+| **Row 2** | 100 | 101 | 102 | S3 → Bank 4 |
+| **Row 3** | 96 | 97 | 98 | S4 → Bank 5 |
+
+#### Bank 4 (Track B) — selected by S3
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 92 | 93 | 94 | S1 → Bank 2 |
+| **Row 1** | 88 | 89 | 90 | S2 → Bank 3 |
+| **Row 2** | 84 | 85 | 86 | S3 → Bank 4 |
+| **Row 3** | 80 | 81 | 82 | S4 → Bank 5 |
+
+#### Bank 5 (Track C) — selected by S4
+
+| | ← Left (Col 3) | Col 2 | Col 1 | Right (Col 0) → |
+|---|---|---|---|---|
+| **Row 0** | 76 | 77 | 78 | S1 → Bank 2 |
+| **Row 1** | 72 | 73 | 74 | S2 → Bank 3 |
+| **Row 2** | 68 | 69 | 70 | S3 → Bank 4 |
+| **Row 3** | 64 | 65 | 66 | S4 → Bank 5 |
+
 ## Build & Flash (CLI equivalent)
 
 ```bash
