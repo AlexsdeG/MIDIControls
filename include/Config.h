@@ -44,8 +44,11 @@ constexpr uint8_t PIANO_OCTAVE_UP_COL = SELECTOR_COL_S1;
 constexpr uint8_t PIANO_OCTAVE_DOWN_ROW = SELECTOR_ROW_S1;
 constexpr uint8_t PIANO_OCTAVE_DOWN_COL = SELECTOR_COL_S2;
 
-constexpr int8_t TRANSPOSE_MIN = -2;
-constexpr int8_t TRANSPOSE_MAX = 2;
+// Safe full-octave transpose range for current piano map:
+// lowest note 55 can go down 4 octaves -> 7,
+// highest note 73 can go up 4 octaves -> 121.
+constexpr int8_t TRANSPOSE_MIN = -4;
+constexpr int8_t TRANSPOSE_MAX = 4;
 
 constexpr pin_t PIN_MATRIX_ROW_1 = 5;
 constexpr pin_t PIN_MATRIX_ROW_2 = 4;
