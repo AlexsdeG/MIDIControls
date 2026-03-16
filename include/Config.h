@@ -65,7 +65,7 @@ constexpr pin_t PIN_RED_BUTTON = 11;
 constexpr pin_t PIN_YELLOW_BUTTON = 10;
 
 constexpr pin_t PIN_BLUE_LED = A4;
-constexpr pin_t PIN_RED_LED = A5;
+constexpr pin_t PIN_RED_LED = 13;
 
 constexpr pin_t PIN_JOYSTICK_X = A3;
 constexpr pin_t PIN_JOYSTICK_Y = A2;
@@ -73,16 +73,12 @@ constexpr pin_t PIN_JOYSTICK_Y = A2;
 constexpr pin_t PIN_ROTARY_1 = A0;
 constexpr pin_t PIN_ROTARY_2 = A1;
 
-constexpr pin_t PIN_IR = 13;
+constexpr pin_t PIN_IR = A5;
 
-constexpr uint16_t IR_REMOTE_ADDRESS = 0x00;
-constexpr uint8_t IR_CMD_PLAY = 0x45;
-constexpr uint8_t IR_CMD_STOP = 0x46;
-constexpr uint8_t IR_CMD_RECORD = 0x47;
-constexpr uint8_t IR_CMD_REWIND = 0x44;
-constexpr uint8_t IR_CMD_FAST_FORWARD = 0x40;
+constexpr Channel IR_MIDI_CHANNEL = Channel_15;
+constexpr uint8_t IR_CC_VALUE_ON = 127;
 constexpr bool IR_IGNORE_REPEAT = true;
-constexpr uint16_t IR_MIN_COMMAND_INTERVAL_MS = 120;
+constexpr uint16_t IR_MIN_COMMAND_INTERVAL_MS = 180;
 
 constexpr uint16_t JOYSTICK_TRANSPOSE_HIGH_THRESHOLD = 800;
 constexpr uint16_t JOYSTICK_TRANSPOSE_LOW_THRESHOLD = 200;

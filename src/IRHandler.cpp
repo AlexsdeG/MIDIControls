@@ -1,31 +1,52 @@
 #include "IRHandler.h"
 
-#include <Control_Surface.h>
+// Arduino core must be first so IRremote finds __FlashStringHelper and F().
+#include <Arduino.h>
+// IRremote must be included BEFORE Control_Surface.
+// Control_Surface defines global DEBUG/TRACE/INFO macros; if IRremote sees
+// them it enables its own debug printing to Serial, which on a MIDI serial
+// port appears as a burst of random MIDI messages on every IR press.
+#ifdef DEBUG
+#undef DEBUG
+#endif
+#ifdef TRACE
+#undef TRACE
+#endif
+#ifdef INFO
+#undef INFO
+#endif
 #include <IRremote.hpp>
+#include <Control_Surface.h>
 
 #include "Config.h"
 #include "Debug.h"
 
 namespace {
-constexpr uint8_t TRANSPORT_VELOCITY = 0x7F;
+constexpr uint8_t INVALID_CC = 0;
 }
 
 void IRHandler::begin() {
-  // BUG-FIX: ENABLE_LED_FEEDBACK with USE_DEFAULT_FEEDBACK_LED_PIN resolves to
-  // LED_BUILTIN (pin 13 on Uno), which is the SAME pin as the IR receiver.
-  // Having IRremote drive pin 13 as OUTPUT while also reading it as INPUT
-  // caused spurious decodes and feedback loops.  Always use DISABLE_LED_FEEDBACK.
   IrReceiver.begin(static_cast<uint_fast8_t>(Config::PIN_IR.pin),
                    DISABLE_LED_FEEDBACK);
-  DBG_TS_MSG("IRHandler: receiver started on pin 13 (LED feedback disabled)");
+  DBG_TS_VAL("IRHandler: receiver started on pin", Config::PIN_IR.pin);
+  DBG_TS_MSG("IRHandler: LED feedback disabled");
 }
 
-void IRHandler::sendMCUTransport(uint8_t noteNumber) const {
-  const MIDIAddress address {noteNumber, Channel_1};
-  DBG_TS_VAL("IRHandler: sending MIDI NoteOn  note", noteNumber);
-  Control_Surface.sendNoteOn(address, TRANSPORT_VELOCITY);
-  DBG_TS_VAL("IRHandler: sending MIDI NoteOff note", noteNumber);
-  Control_Surface.sendNoteOff(address, TRANSPORT_VELOCITY);
+uint8_t IRHandler::commandToCC(uint16_t command) const {
+  const uint8_t cc =
+      static_cast<uint8_t>((command & 0x7F) ^ ((command >> 7) & 0x7F));
+  return cc == 0 ? 127 : cc;
+}
+
+void IRHandler::sendDAWCC(uint8_t cc) const {
+  if (cc == INVALID_CC) {
+    return;
+  }
+
+  const MIDIAddress address {cc, Config::IR_MIDI_CHANNEL};
+  DBG_TS_VAL("IRHandler: sending MIDI CC", cc);
+  DBG_TS_VAL("IRHandler: channel", address.getChannel().getOneBased());
+  Control_Surface.sendControlChange(address, Config::IR_CC_VALUE_ON);
 }
 
 void IRHandler::update() {
@@ -33,63 +54,44 @@ void IRHandler::update() {
     return;
   }
 
-  const auto command = static_cast<uint8_t>(IrReceiver.decodedIRData.command);
+  const auto command = static_cast<uint16_t>(IrReceiver.decodedIRData.command);
   const auto address = static_cast<uint16_t>(IrReceiver.decodedIRData.address);
+  (void)address;
+  const auto flags = IrReceiver.decodedIRData.flags;
   const bool isRepeat =
-      (IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) != 0;
+      (flags & IRDATA_FLAGS_IS_REPEAT) != 0;
+  const bool isOverflow =
+      (flags & IRDATA_FLAGS_WAS_OVERFLOW) != 0;
+  const bool parityFailed =
+      (flags & IRDATA_FLAGS_PARITY_FAILED) != 0;
   const auto now = millis();
+  const bool withinDebounce =
+      (command == lastSentCommand) &&
+      ((now - lastSentAt) < Config::IR_MIN_COMMAND_INTERVAL_MS);
 
   DBG_TS_IR("IRHandler: decoded", address, command);
   if (isRepeat) DBG_PRINTLN("  → repeat flag set");
+  if (isOverflow) DBG_PRINTLN("  → overflow flag set");
+  if (parityFailed) DBG_PRINTLN("  → parity failed");
 
-  if (Config::IR_IGNORE_REPEAT && isRepeat) {
-    DBG_TS_MSG("IRHandler: ignored (repeat)");
+  if ((Config::IR_IGNORE_REPEAT && isRepeat) || isOverflow || parityFailed ||
+      withinDebounce) {
+    if (isRepeat)
+      DBG_TS_MSG("IRHandler: ignored (repeat)");
+    if (isOverflow)
+      DBG_TS_MSG("IRHandler: ignored (overflow)");
+    if (parityFailed)
+      DBG_TS_MSG("IRHandler: ignored (parity failed)");
+    if (withinDebounce)
+      DBG_TS_MSG("IRHandler: ignored (debounce interval)");
     IrReceiver.resume();
     return;
   }
 
-  if (command == lastCommand &&
-      (now - lastDispatchMs) < Config::IR_MIN_COMMAND_INTERVAL_MS) {
-    DBG_TS_MSG("IRHandler: ignored (debounce interval)");
-    IrReceiver.resume();
-    return;
-  }
-
-  if (address != Config::IR_REMOTE_ADDRESS) {
-    DBG_TS_IR("IRHandler: WRONG address (expected 0x0):", address, command);
-    IrReceiver.resume();
-    return;
-  }
-
-  // Address matches – dispatch transport command.
-  if (command == Config::IR_CMD_PLAY) {
-    DBG_TS_MSG("IRHandler: PLAY");
-    sendMCUTransport(MCU::PLAY);
-    lastCommand = command;
-    lastDispatchMs = now;
-  } else if (command == Config::IR_CMD_STOP) {
-    DBG_TS_MSG("IRHandler: STOP");
-    sendMCUTransport(MCU::STOP);
-    lastCommand = command;
-    lastDispatchMs = now;
-  } else if (command == Config::IR_CMD_RECORD) {
-    DBG_TS_MSG("IRHandler: RECORD");
-    sendMCUTransport(MCU::RECORD);
-    lastCommand = command;
-    lastDispatchMs = now;
-  } else if (command == Config::IR_CMD_REWIND) {
-    DBG_TS_MSG("IRHandler: REWIND");
-    sendMCUTransport(MCU::REWIND);
-    lastCommand = command;
-    lastDispatchMs = now;
-  } else if (command == Config::IR_CMD_FAST_FORWARD) {
-    DBG_TS_MSG("IRHandler: FAST_FORWARD");
-    sendMCUTransport(MCU::FAST_FWD);
-    lastCommand = command;
-    lastDispatchMs = now;
-  } else {
-    DBG_TS_HEX("IRHandler: unknown command", command);
-  }
+  const uint8_t cc = commandToCC(command);
+  sendDAWCC(cc);
+  lastSentCommand = command;
+  lastSentAt = now;
 
   IrReceiver.resume();
 }

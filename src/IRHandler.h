@@ -8,8 +8,9 @@ class IRHandler {
   void update();
 
  private:
-  void sendMCUTransport(uint8_t noteNumber) const;
+  uint8_t commandToCC(uint16_t command) const;
+  void sendDAWCC(uint8_t cc) const;
 
-  uint8_t lastCommand = 0;
-  unsigned long lastDispatchMs = 0;
+  uint16_t lastSentCommand = 0xFFFF;
+  unsigned long lastSentAt = 0;
 };

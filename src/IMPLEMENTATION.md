@@ -56,6 +56,14 @@
 - Significant analog deltas for rotaries/joystick
 - IR decode dispatch and filtering decisions
 
+### IR remote behavior
+- IR receiver runs on `PIN_IR` (default `D2`) with LED feedback disabled.
+- Every decoded IR `command` is converted to a deterministic MIDI CC (`1..127`),
+  so the same key always sends the same CC value.
+- IR sends are Control Change on MIDI `Channel_15` with value `127`.
+- Events are ignored when repeat/overflow/parity-failed flags are present,
+  and same-command debounce is applied (`IR_MIN_COMMAND_INTERVAL_MS`).
+
 ## 3. DAW Validation Script (Waveform 13)
 
 1. Flash `uno_debug`, open serial monitor `115200`.
