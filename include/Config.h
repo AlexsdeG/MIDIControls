@@ -25,7 +25,7 @@ constexpr uint8_t MODE_PIANO = 0;
 constexpr uint8_t MODE_DRUM = 1;
 constexpr uint8_t MODE_CONTROL = 2;
 
-constexpr unsigned long BLUE_HOLD_THRESHOLD_MS = 1500;
+constexpr unsigned long BLUE_HOLD_THRESHOLD_MS = 650;
 constexpr unsigned long BLUE_SWITCH_FLASH_MS = 120;
 constexpr unsigned long BLUE_INDICATE_ON_MS = 120;
 constexpr unsigned long BLUE_INDICATE_OFF_MS = 120;
